@@ -3,6 +3,7 @@ const exec = require('@actions/exec');
 const aws = require('aws-sdk');
 
 async function run() {
+  consolelog('init');
   const registryUriState = [];
   const skipLogout = core.getInput('skip-logout', { required: false });
   let ecrType = core.getInput('ecr-type', { required: false });
@@ -86,6 +87,7 @@ async function run() {
         core.debug(doLoginStdout);
         throw new Error('Could not login: ' + doLoginStderr);
       }
+      consolelog('start log');
       core.debug(`login stdout=${doLoginStdout}`);
       core.debug(`login stderr=${doLoginStderr}`);
 
@@ -103,6 +105,7 @@ async function run() {
     }
     core.debug(`'skip-logout' is ${skipLogout} for ${registryUriState.length} registries.`);
   }
+  console.log('end');
 }
 
 module.exports = run;
