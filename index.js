@@ -86,6 +86,8 @@ async function run() {
         core.debug(doLoginStdout);
         throw new Error('Could not login: ' + doLoginStderr);
       }
+      core.debug(doLoginStdout);
+      core.debug(doLoginStderr);
 
       registryUriState.push(registryUri);
     }
