@@ -5,7 +5,11 @@ const aws = require('aws-sdk');
 async function run() {
   const registryUriState = [];
   const skipLogout = core.getInput('skip-logout', { required: false });
+  let ecrType = core.getInput('ecr-type', { required: false });
 
+  if (ecrType != 'public') {
+    ecrType = 'private';
+  }
   try {
     const registries = core.getInput('registries', { required: false });
 
@@ -13,8 +17,12 @@ async function run() {
     const ecr = new aws.ECR({
       customUserAgent: 'amazon-ecr-login-for-github-actions'
     });
+    const ecrpublic = new aws.ECRPUBLIC({
+      customUserAgent: 'amazon-ecr-login-for-github-actions',
+      region: 'us-east-1'
+    });
     const authTokenRequest = {};
-    if (registries) {
+    if (registries && isecrprivate) {
       const registryIds = registries.split(',');
       core.debug(`Requesting auth token for ${registryIds.length} registries:`);
       for (const id of registryIds) {
@@ -22,7 +30,21 @@ async function run() {
       }
       authTokenRequest.registryIds = registryIds;
     }
-    const authTokenResponse = await ecr.getAuthorizationToken(authTokenRequest).promise();
+
+    let authTokenResponse;
+
+    switch (ecrType) {
+      case 'public': {
+        authTokenResponse = await ecrpublic.getAuthorizationToken({}).promise();
+        authTokenResponse.authorizationData = [ authTokenResponse.authorizationData ];
+        break;
+      }
+      default: {
+        authTokenResponse = await ecr.getAuthorizationToken(authTokenRequest).promise();
+        break;
+      }
+    }
+
     if (!Array.isArray(authTokenResponse.authorizationData) || !authTokenResponse.authorizationData.length) {
       throw new Error('Could not retrieve an authorization token from Amazon ECR');
     }
@@ -30,8 +52,14 @@ async function run() {
     for (const authData of authTokenResponse.authorizationData) {
       const authToken = Buffer.from(authData.authorizationToken, 'base64').toString('utf-8');
       const creds = authToken.split(':', 2);
-      const proxyEndpoint = authData.proxyEndpoint;
-      const registryUri = proxyEndpoint.replace(/^https?:\/\//,'');
+      let registryUri, proxyEndpoint;
+      if (ecrType == 'private') {
+        proxyEndpoint = authData.proxyEndpoint;
+        registryUri = proxyEndpoint.replace(/^https?:\/\//,''); 
+      } else {
+        registryUri = 'public.ecr.aws';
+        proxyEndpoint = registryUri;
+      }
 
       if (authTokenResponse.authorizationData.length == 1) {
         // output the registry URI if this action is doing a single registry login
